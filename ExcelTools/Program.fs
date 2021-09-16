@@ -35,10 +35,6 @@ let removeSheetProtection (sheetDoc : XmlDocument) =
         printfn "Sheet was not protected."
 
 
-
-
-
-
 [<EntryPoint>]
 let main _ =
     let parser = ArgumentParser.Create<CliArguments> ()
@@ -48,41 +44,48 @@ let main _ =
         let file = file |> FileInfo
         if file.Exists then
             printf "Found file '%s'" file.FullName
-            use outFile = 
+            try
+                use zip = ZipFile.OpenRead(file.FullName)
                 let fileName = sprintf "%sunprotected%s" file.FullName.[0..file.FullName.Length - file.Extension.Length] file.Extension
-                printfn " … will write to '%s'" fileName
-                ZipFile.Open(fileName, ZipArchiveMode.Create)
-            use zip = ZipFile.OpenRead(file.FullName)
-            let isSheet = 
-                let sheets = 
-                    let entry = zip.GetEntry("[Content_Types].xml")
-                    use stream = entry.Open ()
-                    use reader = XmlReader.Create stream
-                    reader |> findWorksheets |> List.map (fun c -> c.[1..]) 
-                fun partName -> List.contains partName sheets
-            
-            zip.Entries
-            |> Seq.iter (fun entry -> 
-                if entry.FullName |> isSheet then
-                    printfn "Processing %s" entry.FullName
-                    use inStream = entry.Open ()
-                    let doc = 
-                        let doc = XmlDocument()
-                        doc.Load inStream
-                        doc
-                    doc |> removeSheetProtection
+                try
+                    use outFile =     
+                        printfn " … will write to '%s'" fileName
+                        ZipFile.Open(fileName, ZipArchiveMode.Create)
+                    
+                    let isSheet = 
+                        let sheets = 
+                            let entry = zip.GetEntry("[Content_Types].xml")
+                            use stream = entry.Open ()
+                            use reader = XmlReader.Create stream
+                            reader |> findWorksheets |> List.map (fun c -> c.[1..]) 
+                        fun partName -> List.contains partName sheets
+                    
+                    zip.Entries
+                    |> Seq.iter (fun entry -> 
+                        if entry.FullName |> isSheet then
+                            printfn "Processing %s" entry.FullName
+                            use inStream = entry.Open ()
+                            let doc = 
+                                let doc = XmlDocument()
+                                doc.Load inStream
+                                doc
+                            doc |> removeSheetProtection
 
-                    let newEntry = outFile.CreateEntry entry.FullName
-                    use outStream = newEntry.Open ()
-                    doc.Save(outStream)
-                else
-                    printfn "Copying %s" entry.FullName
-                    use inStream = entry.Open ()
-                    let newEntry = outFile.CreateEntry entry.FullName
-                    use outStream = newEntry.Open ()
-                    inStream.CopyTo outStream
-            )
-        else printfn "File %O could not be found!" file
+                            let newEntry = outFile.CreateEntry entry.FullName
+                            use outStream = newEntry.Open ()
+                            doc.Save(outStream)
+                        else
+                            printfn "Copying %s" entry.FullName
+                            use inStream = entry.Open ()
+                            let newEntry = outFile.CreateEntry entry.FullName
+                            use outStream = newEntry.Open ()
+                            inStream.CopyTo outStream
+                    )
+
+                    printfn "File '%s' processed\n" file.FullName
+                with e -> printfn "Could not write target file '%s' with error: %s\n" fileName e.Message
+            with e -> printfn "\nCould not process file '%s'.\n\tIs it an Excel file?\n\tIs it a password protected file?\n" file.FullName
+        else printfn "File %O could not be found!\n" file
     )
 
     0 // return an integer exit code
