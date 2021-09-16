@@ -37,7 +37,8 @@ let removeSheetProtection (sheetDoc : XmlDocument) =
 
 [<EntryPoint>]
 let main _ =
-    let parser = ArgumentParser.Create<CliArguments> ()
+    let exiter = ProcessExiter(fun _ -> Some ConsoleColor.Red)
+    let parser = ArgumentParser.Create<CliArguments> (programName = "ExcelTools", errorHandler = exiter)
     let config = parser.Parse ()
     config.GetResult Files
     |> List.iter (fun file ->
