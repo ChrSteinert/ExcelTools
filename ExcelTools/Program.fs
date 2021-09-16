@@ -7,13 +7,15 @@ open Argu
 
 type CliArguments = 
     // | [<AltCommandLine("-i")>] Inplace
+    | [<AltCommandLine("-o")>] OutDir of string
     | [<MainCommand; ExactlyOnce; Last>] Files of string list
 
     interface IArgParserTemplate with
         member this.Usage = 
             match this with
             // | Inplace -> "change the files directly, instead of making copies."
-            | Files _ -> "the files."
+            | OutDir _ -> "a directory to write all unprotected (or copied) Excels to."
+            | Files _ -> "the Excel files to unprotect."
 
 
 let findWorksheets (contentTypesXml : XmlReader) = 
@@ -34,12 +36,22 @@ let removeSheetProtection (sheetDoc : XmlDocument) =
     else
         printfn "Sheet was not protected."
 
+let createOutDirIfNotExists (config : ParseResults<CliArguments>) =
+    match config.TryGetResult OutDir with
+    | Some dir -> 
+        let dir = dir |> DirectoryInfo
+        if dir.Exists |> not then dir.Create ()
+        printfn "Created output directory '%s'" dir.FullName
+    | None -> ()        
 
 [<EntryPoint>]
 let main _ =
     let exiter = ProcessExiter(fun _ -> Some ConsoleColor.Red)
     let parser = ArgumentParser.Create<CliArguments> (programName = "ExcelTools", errorHandler = exiter)
     let config = parser.Parse ()
+
+    createOutDirIfNotExists config
+
     config.GetResult Files
     |> List.iter (fun file ->
         let file = file |> FileInfo
@@ -47,7 +59,10 @@ let main _ =
             printf "Found file '%s'" file.FullName
             try
                 use zip = ZipFile.OpenRead(file.FullName)
-                let fileName = sprintf "%sunprotected%s" file.FullName.[0..file.FullName.Length - file.Extension.Length] file.Extension
+                let fileName = 
+                    let dir = config.GetResult(OutDir, file.Directory.FullName)
+                    let name = sprintf "%sunprotected%s" file.Name.[0..file.Name.Length - file.Extension.Length] file.Extension
+                    IO.Path.Join [| dir; name |]
                 try
                     use outFile =     
                         printfn " … will write to '%s'" fileName
