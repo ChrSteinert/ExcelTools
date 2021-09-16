@@ -27,4 +27,6 @@ jobs:
 
       # Runs a single command using the runners shell
       - name: Publish
-        run: dotnet publish -c Release --self-contained -r win10-x64
+        run: |
+          dotnet tool restore
+          dotnet publish -c Release --self-contained -r win10-x64
