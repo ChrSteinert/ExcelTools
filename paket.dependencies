@@ -1,7 +1,8 @@
 source https://api.nuget.org/v3/index.json
 
 storage: none
-framework: net5.0, netstandard2.0, netstandard2.1
+framework: netcoreapp3.1
 
 nuget FSharp.Core
 nuget Argu
+nuget DocumentFormat.OpenXml
